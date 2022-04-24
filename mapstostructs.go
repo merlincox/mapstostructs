@@ -6,23 +6,34 @@ import (
 	"strings"
 )
 
-// MapsToStructs provides functionality for a slice of structs to generated from a slice of map[string]interface{}
-func MapsToStructs(maps []map[string]interface{}, receivers interface{}, tags ...string) error {
-	errorMsg := "receivers argument must be a ptr to a slice of struct but a %s was given"
+const (
+	badReceiverMsg = "the receivers argument must be a ptr to a slice of struct but a %s was given"
+	badFieldMsg    = "the %s field for a struct of type %s must be of type %s but received a value of type %s in row %d"
+)
+
+// MapsToStructs provides functionality for a slice of structs to be generated from a slice of map[string]interface{}
+// with the option of passing additional struct tags to use as map keys. If no tags are specified the json tag is
+// used and if that is missing, the lowercase value of the struct field is assumed.
+// The receivers argument must be a pointer to a slice of structs.
+func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, tags ...string) error {
 	if reflect.ValueOf(receivers).Kind() != reflect.Ptr {
-		return fmt.Errorf(errorMsg, reflect.ValueOf(receivers).Kind().String())
+		return fmt.Errorf(badReceiverMsg, reflect.ValueOf(receivers).Kind().String())
 	}
 	receivingValues := reflect.Indirect(reflect.ValueOf(receivers))
 	if receivingValues.Kind() != reflect.Slice {
-		return fmt.Errorf(errorMsg, "ptr to a "+receivingValues.Kind().String())
+		return fmt.Errorf(badReceiverMsg, "ptr to a "+receivingValues.Kind().String())
 	}
 	structType := receivingValues.Type().Elem()
 	if structType.Kind() != reflect.Struct {
-		return fmt.Errorf(errorMsg, "ptr to a slice of "+structType.Kind().String())
+		return fmt.Errorf(badReceiverMsg, "ptr to a slice of "+structType.Kind().String())
 	}
-	tagMap := make(map[string]string, structType.NumField())
+	if len(inputMaps) == 0 {
+		return nil
+	}
+	numFields := structType.NumField()
+	tagMap := make(map[string]string, numFields)
 	tags = append(tags, "json")
-	for i := 0; i < structType.NumField(); i++ {
+	for i := 0; i < numFields; i++ {
 		field := structType.Field(i)
 		var tagged bool
 		for _, tagName := range tags {
@@ -38,38 +49,55 @@ func MapsToStructs(maps []map[string]interface{}, receivers interface{}, tags ..
 		}
 	}
 
-	for i, thisMap := range maps {
-		thisVal := reflect.Indirect(reflect.New(structType))
+	for i, thisMap := range inputMaps {
+		thisValue := reflect.Indirect(reflect.New(structType))
 		for key, value := range thisMap {
 			if fieldName, ok := tagMap[strings.ToLower(key)]; ok {
-				err := setStructField(thisVal.Addr().Interface(), fieldName, value, i+1)
+				err := setStructField(thisValue.Addr().Interface(), fieldName, value, i+1)
 				if err != nil {
 					return err
 				}
 			}
 		}
-		receivingValues = reflect.Append(receivingValues, thisVal)
+		receivingValues = reflect.Append(receivingValues, thisValue)
 	}
 	reflect.ValueOf(receivers).Elem().Set(receivingValues)
 
 	return nil
 }
 
-func setStructField(obj interface{}, fieldName string, value interface{}, line int) error {
-	rField := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
-	rValue := reflect.ValueOf(value)
+func setStructField(object interface{}, fieldName string, mapValue interface{}, line int) error {
+	field := reflect.ValueOf(object).Elem().FieldByName(fieldName)
+	value := reflect.ValueOf(mapValue)
+	want := field.Kind().String()
+	have := value.Kind().String()
+	structName := reflect.ValueOf(object).Elem().Type().Name()
 
-	if rField.Type() != rValue.Type() {
-		return fmt.Errorf(
-			"the %s field for a %s must be of type %s but a value of type %s was given on row %d",
-			fieldName,
-			reflect.ValueOf(obj).Elem().Type().Name(),
-			rField.Kind().String(),
-			rValue.Kind().String(),
-			line,
-		)
+	if field.Type().Kind() != reflect.Ptr {
+		if field.Type() == value.Type() {
+			field.Set(value)
+
+			return nil
+		}
+	} else {
+		want = field.Type().Elem().Kind().String()
+		if value.Type().Kind() == reflect.Ptr {
+			have = value.Elem().Kind().String()
+			if field.Type().Elem() == value.Elem().Type() {
+				field.Set(reflect.New(field.Type().Elem()))
+				field.Elem().Set(value.Elem())
+
+				return nil
+			}
+		} else {
+			if field.Type().Elem() == value.Type() {
+				field.Set(reflect.New(field.Type().Elem()))
+				field.Elem().Set(value)
+
+				return nil
+			}
+		}
 	}
-	rField.Set(rValue)
 
-	return nil
+	return fmt.Errorf(badFieldMsg, fieldName, structName, want, have, line)
 }
