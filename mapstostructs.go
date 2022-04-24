@@ -12,9 +12,13 @@ const (
 )
 
 // MapsToStructs provides functionality for a slice of structs to be generated from a slice of map[string]interface{}
-// with the option of passing additional struct tags to use as map keys. If no tags are specified the json tag is
-// used and if that is missing, the lowercase value of the struct field is assumed.
+// with the option of passing alternative struct tags to use as map keys. If no tags are specified the json tag is
+// used and if that is not present, the lowercase value of the struct field is assumed.
+//
 // The receivers argument must be a pointer to a slice of structs.
+//
+// Type conversions to the struct type are performed where permitted by the reflect library. This helps with the
+// situation where integer values have been JSON-unmarshalled into float64 values in a map.
 func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, tags ...string) error {
 	if reflect.ValueOf(receivers).Kind() != reflect.Ptr {
 		return fmt.Errorf(badReceiverMsg, reflect.ValueOf(receivers).Kind().String())

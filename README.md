@@ -1,6 +1,8 @@
 # mapstostructs
 
-A simple utility function to convert from `map[string]interface{}` to a slice of structs, with the option to specify tags for the map keys.
+A simple utility function to convert from `map[string]interface{}` to a slice of structs, with the option to specify alternative tags for the map keys.
+
+Type conversions to the struct type are performed where permitted by the `reflect` library. This helps with the situation where integer values have been JSON-unmarshalled into `float64` values in a map.
 
 ```go
 package main
