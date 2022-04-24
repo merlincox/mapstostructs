@@ -65,9 +65,64 @@ func TestMapsToStructsSimple(t *testing.T) {
 	}
 }
 
+func TestMapsToStructsWithConvert(t *testing.T) {
+	maps := []map[string]interface{}{
+		{"id": float64(213), "name": "Zhaoliu", "gender": "male", "age": 19,
+			"sports": []string{"football", "tennis"},
+			"location": Location{
+				Country: "UK",
+				City:    "London",
+			}},
+		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
+		{"id": 7, "name": "Lisi", "gender": "female", "age": 54},
+		{"id": 978, "name": "Wangwu", "gender": "male", "age": 28},
+	}
+
+	var users []User
+
+	err := mapstostructs.MapsToStructs(maps, &users)
+
+	if assert.Nil(t, err, "error should be nil for valid call") {
+		if assert.Equal(t, 4, len(users), "all rows should be returned") {
+			assert.Equal(t, 19, users[0].Age, "values should be correctly set at start")
+			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start")
+			assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end")
+		}
+	}
+}
+
 func TestMapsToStructsWithPointers(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19,
+			"sports": &[]string{"football", "tennis"},
+			"location": &Location{
+				Country: "UK",
+				City:    "London",
+			}},
+		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
+		{"id": 7, "name": "Lisi", "gender": "female", "age": 54},
+		{"id": 978, "name": "Wangwu", "gender": "male", "age": 28},
+	}
+
+	var users []UserWithPointers
+
+	err := mapstostructs.MapsToStructs(maps, &users)
+
+	if assert.Nil(t, err, "error should be nil for valid call with struct containing pointer") {
+		if assert.Equal(t, 4, len(users), "all rows should be returned with struct containing pointer") {
+			assert.Equal(t, 19, *users[0].Age, "values should be correctly set at start with struct containing pointer")
+			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end with struct containing pointer")
+			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start with struct containing pointer")
+			sports := users[0].Sports
+			assert.Equal(t, "football", (*sports)[0], "values should be correctly set at start with struct containing pointer")
+		}
+	}
+}
+
+func TestMapsToStructsWithPointersAndConvert(t *testing.T) {
+	maps := []map[string]interface{}{
+		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": float64(19),
 			"sports": &[]string{"football", "tennis"},
 			"location": &Location{
 				Country: "UK",

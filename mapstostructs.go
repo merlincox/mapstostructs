@@ -79,6 +79,11 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 
 			return nil
 		}
+		if value.CanConvert(field.Type()) {
+			field.Set(value.Convert(field.Type()))
+
+			return nil
+		}
 	} else {
 		want = field.Type().Elem().Kind().String()
 		if value.Type().Kind() == reflect.Ptr {
@@ -89,10 +94,22 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 
 				return nil
 			}
+			if value.Elem().CanConvert(field.Type().Elem()) {
+				field.Set(reflect.New(field.Type().Elem()))
+				field.Elem().Set(value.Elem().Convert(field.Type().Elem()))
+
+				return nil
+			}
 		} else {
 			if field.Type().Elem() == value.Type() {
 				field.Set(reflect.New(field.Type().Elem()))
 				field.Elem().Set(value)
+
+				return nil
+			}
+			if value.CanConvert(field.Type().Elem()) {
+				field.Set(reflect.New(field.Type().Elem()))
+				field.Elem().Set(value.Convert(field.Type().Elem()))
 
 				return nil
 			}
