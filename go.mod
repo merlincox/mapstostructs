@@ -1,4 +1,4 @@
-module mapstostructs
+module github.com/merlincox/mapstostructs
 
 go 1.17
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"mapstostructs"
+	"github.com/merlincox/mapstostructs"
 )
 
 type User struct {
