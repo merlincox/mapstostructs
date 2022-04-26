@@ -78,15 +78,29 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 	structName := reflect.ValueOf(object).Elem().Type().Name()
 
 	if field.Type().Kind() != reflect.Ptr {
-		if field.Type() == value.Type() {
-			field.Set(value)
+		if value.Type().Kind() == reflect.Ptr {
+			have = value.Elem().Kind().String()
+			if field.Type() == value.Elem().Type() {
+				field.Set(value.Elem())
 
-			return nil
-		}
-		if value.CanConvert(field.Type()) {
-			field.Set(value.Convert(field.Type()))
+				return nil
+			}
+			if value.Elem().CanConvert(field.Type()) {
+				field.Set(value.Elem().Convert(field.Type()))
 
-			return nil
+				return nil
+			}
+		} else {
+			if field.Type() == value.Type() {
+				field.Set(value)
+
+				return nil
+			}
+			if value.CanConvert(field.Type()) {
+				field.Set(value.Convert(field.Type()))
+
+				return nil
+			}
 		}
 	} else {
 		want = field.Type().Elem().Kind().String()
