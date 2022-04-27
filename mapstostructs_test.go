@@ -59,7 +59,9 @@ func TestMapsToStructsSimple(t *testing.T) {
 		if assert.Equal(t, 4, len(users), "all rows should be returned") {
 			assert.Equal(t, 19, users[0].Age, "values should be correctly set at start")
 			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start")
-			assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			if assert.Equal(t, 2, len(users[0].Sports), "slices should be the right size") {
+				assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			}
 			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end")
 		}
 	}
@@ -88,7 +90,9 @@ func TestMapsToStructsMapWithPointers(t *testing.T) {
 		if assert.Equal(t, 4, len(users), "all rows should be returned") {
 			assert.Equal(t, 19, users[0].Age, "values should be correctly set at start")
 			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start")
-			assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			if assert.Equal(t, 2, len(users[0].Sports), "slices should be the right size") {
+				assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			}
 			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end")
 		}
 	}
@@ -115,7 +119,9 @@ func TestMapsToStructsWithConvert(t *testing.T) {
 		if assert.Equal(t, 4, len(users), "all rows should be returned") {
 			assert.Equal(t, 19, users[0].Age, "values should be correctly set at start")
 			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start")
-			assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			if assert.Equal(t, 2, len(users[0].Sports), "slices should be the right size") {
+				assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			}
 			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end")
 		}
 	}
@@ -143,8 +149,10 @@ func TestMapsToStructsWithPointers(t *testing.T) {
 			assert.Equal(t, 19, *users[0].Age, "values should be correctly set at start with struct containing pointer")
 			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end with struct containing pointer")
 			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start with struct containing pointer")
-			sports := users[0].Sports
-			assert.Equal(t, "football", (*sports)[0], "values should be correctly set at start with struct containing pointer")
+			if assert.Equal(t, 2, len(*users[0].Sports), "slices should be the right size") {
+				sports := users[0].Sports
+				assert.Equal(t, "football", (*sports)[0], "values should be correctly set at start with struct containing pointer")
+			}
 		}
 	}
 }
@@ -171,8 +179,10 @@ func TestMapsToStructsWithPointersAndConvert(t *testing.T) {
 			assert.Equal(t, 19, *users[0].Age, "values should be correctly set at start with struct containing pointer")
 			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end with struct containing pointer")
 			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start with struct containing pointer")
-			sports := users[0].Sports
-			assert.Equal(t, "football", (*sports)[0], "values should be correctly set at start with struct containing pointer")
+			if assert.Equal(t, 2, len(*users[0].Sports), "slices should be the right size") {
+				sports := users[0].Sports
+				assert.Equal(t, "football", (*sports)[0], "values should be correctly set at start with struct containing pointer")
+			}
 		}
 	}
 }
