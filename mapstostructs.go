@@ -8,6 +8,7 @@ import (
 
 const (
 	badReceiversMsg = "the receivers argument must be a ptr to a slice of struct but a %s was given"
+	badReceiverMsg  = "the receiver argument must be a ptr to a struct but a %s was given"
 	badFieldMsg     = "the %s field for a struct of type %s must be of type %s but received a value of type %s in row %d"
 )
 
@@ -66,6 +67,46 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 		receivingValues = reflect.Append(receivingValues, thisReceiver)
 	}
 	reflect.ValueOf(receivers).Elem().Set(receivingValues)
+
+	return nil
+}
+
+func MapToStruct(inputMap map[string]interface{}, receiver interface{}, tags ...string) error {
+	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
+		return fmt.Errorf(badReceiverMsg, reflect.ValueOf(receiver).Kind().String())
+	}
+	structType := reflect.Indirect(reflect.ValueOf(receiver)).Type()
+	if structType.Kind() != reflect.Struct {
+		return fmt.Errorf(badReceiverMsg, "ptr to a slice of "+structType.Kind().String())
+	}
+	numFields := structType.NumField()
+	tagMap := make(map[string]string, numFields)
+	tags = append(tags, "json")
+	for i := 0; i < numFields; i++ {
+		field := structType.Field(i)
+		var tagged bool
+		for _, tagName := range tags {
+			tag, ok := field.Tag.Lookup(tagName)
+			if ok {
+				tagMap[tag] = field.Name
+				tagged = true
+				break
+			}
+		}
+		if !tagged {
+			tagMap[strings.ToLower(field.Name)] = field.Name
+		}
+	}
+
+	thisReceiver := reflect.Indirect(reflect.New(structType))
+	for key, value := range inputMap {
+		if fieldName, ok := tagMap[strings.ToLower(key)]; ok {
+			err := setStructField(thisReceiver.Addr().Interface(), fieldName, value, 0) //row..
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }

@@ -282,3 +282,28 @@ func TestMapsToStructsPointerBadReceiver3(t *testing.T) {
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
+
+func TestMapsToStructsSingle(t *testing.T) {
+	map1 := map[string]interface{}{
+		"id":     213,
+		"name":   "Zhaoliu",
+		"gender": "male",
+		"age":    19,
+		"sports": []string{"football", "tennis"},
+		"location": Location{
+			Country: "UK",
+			City:    "London",
+		}}
+
+	var user User
+
+	err := mapstostructs.MapToStruct(map1, &user)
+
+	if assert.Nil(t, err, "error should be nil for valid call") {
+		assert.Equal(t, 19, user.Age, "values should be correctly set")
+		assert.Equal(t, "UK", user.Location.Country, "values should be correctly set")
+		if assert.Equal(t, 2, len(user.Sports), "slices should be the right size") {
+			assert.Equal(t, "football", user.Sports[0], "values should be correctly set")
+		}
+	}
+}
