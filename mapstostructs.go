@@ -79,17 +79,16 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 }
 
 func innerSetStructField(field reflect.Value, value reflect.Value, structName, fieldName string, line int) error {
+	if value.Type().Kind() == reflect.Ptr {
+
+		return innerSetStructField(field, value.Elem(), structName, fieldName, line)
+	}
 	have := value.Kind().String()
 	wantType := field.Type()
 	if field.Type().Kind() == reflect.Ptr {
 		wantType = field.Type().Elem()
 	}
 	want := wantType.Kind().String()
-
-	if value.Type().Kind() == reflect.Ptr {
-
-		return innerSetStructField(field, value.Elem(), structName, fieldName, line)
-	}
 
 	if value.Type() == wantType {
 		setField(field, value)
