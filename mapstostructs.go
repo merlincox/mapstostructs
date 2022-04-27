@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	badReceiverMsg = "the receivers argument must be a ptr to a slice of struct but a %s was given"
-	badFieldMsg    = "the %s field for a struct of type %s must be of type %s but received a value of type %s in row %d"
+	badReceiversMsg = "the receivers argument must be a ptr to a slice of struct but a %s was given"
+	badFieldMsg     = "the %s field for a struct of type %s must be of type %s but received a value of type %s in row %d"
 )
 
 // MapsToStructs provides functionality for a slice of structs to be generated from a slice of map[string]interface{}
@@ -21,15 +21,15 @@ const (
 // situation where integer values have been JSON-unmarshalled into float64 values in a map.
 func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, tags ...string) error {
 	if reflect.ValueOf(receivers).Kind() != reflect.Ptr {
-		return fmt.Errorf(badReceiverMsg, reflect.ValueOf(receivers).Kind().String())
+		return fmt.Errorf(badReceiversMsg, reflect.ValueOf(receivers).Kind().String())
 	}
 	receivingValues := reflect.Indirect(reflect.ValueOf(receivers))
 	if receivingValues.Kind() != reflect.Slice {
-		return fmt.Errorf(badReceiverMsg, "ptr to a "+receivingValues.Kind().String())
+		return fmt.Errorf(badReceiversMsg, "ptr to a "+receivingValues.Kind().String())
 	}
 	structType := receivingValues.Type().Elem()
 	if structType.Kind() != reflect.Struct {
-		return fmt.Errorf(badReceiverMsg, "ptr to a slice of "+structType.Kind().String())
+		return fmt.Errorf(badReceiversMsg, "ptr to a slice of "+structType.Kind().String())
 	}
 	if len(inputMaps) == 0 {
 		return nil
@@ -54,16 +54,16 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 	}
 
 	for i, thisMap := range inputMaps {
-		thisValue := reflect.Indirect(reflect.New(structType))
+		thisReceiver := reflect.Indirect(reflect.New(structType))
 		for key, value := range thisMap {
 			if fieldName, ok := tagMap[strings.ToLower(key)]; ok {
-				err := setStructField(thisValue.Addr().Interface(), fieldName, value, i+1)
+				err := setStructField(thisReceiver.Addr().Interface(), fieldName, value, i+1)
 				if err != nil {
 					return err
 				}
 			}
 		}
-		receivingValues = reflect.Append(receivingValues, thisValue)
+		receivingValues = reflect.Append(receivingValues, thisReceiver)
 	}
 	reflect.ValueOf(receivers).Elem().Set(receivingValues)
 
