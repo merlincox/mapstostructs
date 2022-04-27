@@ -73,66 +73,49 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 func setStructField(object interface{}, fieldName string, mapValue interface{}, line int) error {
 	field := reflect.ValueOf(object).Elem().FieldByName(fieldName)
 	value := reflect.ValueOf(mapValue)
-	want := field.Kind().String()
-	have := value.Kind().String()
 	structName := reflect.ValueOf(object).Elem().Type().Name()
 
-	if field.Type().Kind() != reflect.Ptr {
-		if value.Type().Kind() == reflect.Ptr {
-			have = value.Elem().Kind().String()
-			if field.Type() == value.Elem().Type() {
-				field.Set(value.Elem())
+	return innerSetStructField(field, value, structName, fieldName, line)
+}
 
-				return nil
-			}
-			if value.Elem().CanConvert(field.Type()) {
-				field.Set(value.Elem().Convert(field.Type()))
-
-				return nil
-			}
-		} else {
-			if field.Type() == value.Type() {
-				field.Set(value)
-
-				return nil
-			}
-			if value.CanConvert(field.Type()) {
-				field.Set(value.Convert(field.Type()))
-
-				return nil
-			}
-		}
-	} else {
+func innerSetStructField(field reflect.Value, value reflect.Value, structName, fieldName string, line int) error {
+	have := value.Kind().String()
+	want := field.Kind().String()
+	if field.Type().Kind() == reflect.Ptr {
 		want = field.Type().Elem().Kind().String()
-		if value.Type().Kind() == reflect.Ptr {
-			have = value.Elem().Kind().String()
-			if field.Type().Elem() == value.Elem().Type() {
-				field.Set(reflect.New(field.Type().Elem()))
-				field.Elem().Set(value.Elem())
+	}
 
-				return nil
-			}
-			if value.Elem().CanConvert(field.Type().Elem()) {
-				field.Set(reflect.New(field.Type().Elem()))
-				field.Elem().Set(value.Elem().Convert(field.Type().Elem()))
+	if value.Type().Kind() == reflect.Ptr {
 
-				return nil
-			}
-		} else {
-			if field.Type().Elem() == value.Type() {
-				field.Set(reflect.New(field.Type().Elem()))
-				field.Elem().Set(value)
+		return innerSetStructField(field, value.Elem(), structName, fieldName, line)
+	}
 
-				return nil
-			}
-			if value.CanConvert(field.Type().Elem()) {
-				field.Set(reflect.New(field.Type().Elem()))
-				field.Elem().Set(value.Convert(field.Type().Elem()))
+	if field.Type() == value.Type() || (field.Type().Kind() == reflect.Ptr && (field.Type().Elem() == value.Type())) {
+		setField(field, value)
 
-				return nil
-			}
-		}
+		return nil
+	}
+
+	if value.CanConvert(field.Type()) {
+		setField(field, value.Convert(field.Type()))
+
+		return nil
+	}
+
+	if field.Type().Kind() == reflect.Ptr && value.CanConvert(field.Type().Elem()) {
+		setField(field, value.Convert(field.Type().Elem()))
+
+		return nil
 	}
 
 	return fmt.Errorf(badFieldMsg, fieldName, structName, want, have, line)
+}
+
+func setField(field reflect.Value, value reflect.Value) {
+	if field.Type().Kind() == reflect.Ptr {
+		field.Set(reflect.New(field.Type().Elem()))
+		field.Elem().Set(value)
+	} else {
+		field.Set(value)
+	}
 }
