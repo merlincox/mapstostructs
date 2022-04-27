@@ -80,30 +80,25 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 
 func innerSetStructField(field reflect.Value, value reflect.Value, structName, fieldName string, line int) error {
 	have := value.Kind().String()
-	want := field.Kind().String()
+	wantType := field.Type()
 	if field.Type().Kind() == reflect.Ptr {
-		want = field.Type().Elem().Kind().String()
+		wantType = field.Type().Elem()
 	}
+	want := wantType.Kind().String()
 
 	if value.Type().Kind() == reflect.Ptr {
 
 		return innerSetStructField(field, value.Elem(), structName, fieldName, line)
 	}
 
-	if field.Type() == value.Type() || (field.Type().Kind() == reflect.Ptr && (field.Type().Elem() == value.Type())) {
+	if value.Type() == wantType {
 		setField(field, value)
 
 		return nil
 	}
 
-	if value.CanConvert(field.Type()) {
-		setField(field, value.Convert(field.Type()))
-
-		return nil
-	}
-
-	if field.Type().Kind() == reflect.Ptr && value.CanConvert(field.Type().Elem()) {
-		setField(field, value.Convert(field.Type().Elem()))
+	if value.CanConvert(wantType) {
+		setField(field, value.Convert(wantType))
 
 		return nil
 	}
