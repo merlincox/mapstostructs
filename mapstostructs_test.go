@@ -67,6 +67,65 @@ func TestMapsToStructsSimple(t *testing.T) {
 	}
 }
 
+func TestMapsToStructsInnerMap(t *testing.T) {
+	maps := []map[string]interface{}{
+		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19,
+			"sports": []string{"football", "tennis"},
+			"location": map[string]interface{}{
+				"country": "UK",
+				"city":    "London",
+			}},
+		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
+		{"id": 7, "name": "Lisi", "gender": "female", "age": 54},
+		{"id": 978, "name": "Wangwu", "gender": "male", "age": 28},
+	}
+
+	var users []User
+
+	err := mapstostructs.MapsToStructs(maps, &users)
+
+	if assert.Nil(t, err, "error should be nil for valid call") {
+		if assert.Equal(t, 4, len(users), "all rows should be returned") {
+			assert.Equal(t, 19, users[0].Age, "values should be correctly set at start")
+			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start")
+			if assert.Equal(t, 2, len(users[0].Sports), "slices should be the right size") {
+				assert.Equal(t, "football", users[0].Sports[0], "values should be correctly set at start")
+			}
+			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end")
+		}
+	}
+}
+
+func xTestMapsToStructsInnerMapPointers(t *testing.T) {
+	maps := []map[string]interface{}{
+		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19,
+			"sports": []string{"football", "tennis"},
+			"location": map[string]interface{}{
+				"country": "UK",
+				"city":    "London",
+			}},
+		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
+		{"id": 7, "name": "Lisi", "gender": "female", "age": 54},
+		{"id": 978, "name": "Wangwu", "gender": "male", "age": 28},
+	}
+
+	var users []UserWithPointers
+
+	err := mapstostructs.MapsToStructs(maps, &users)
+
+	if assert.Nil(t, err, "error should be nil for valid call") {
+		if assert.Equal(t, 4, len(users), "all rows should be returned") {
+			assert.Equal(t, 19, users[0].Age, "values should be correctly set at start")
+			assert.Equal(t, "UK", users[0].Location.Country, "values should be correctly set at start")
+			if assert.Equal(t, 2, len(*users[0].Sports), "slices should be the right size") {
+				sports := users[0].Sports
+				assert.Equal(t, "football", (*sports)[0], "values should be correctly set at start")
+			}
+			assert.Equal(t, 978, users[3].ID, "values should be correctly set at end")
+		}
+	}
+}
+
 func TestMapsToStructsMapWithPointers(t *testing.T) {
 	male := "male"
 	nineteen := float64(19)
