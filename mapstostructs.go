@@ -11,6 +11,8 @@ const (
 	badReceiverMsg     = "the receiver argument must be a ptr to a struct but a %s was given"
 	badFieldMsg        = "the %s field for a struct of type %s must be of type %s but received a value of type %s"
 	badFieldMsgWithRow = "%s in row %d"
+
+	jsonTag = "json"
 )
 
 // MapsToStructs provides functionality for a slice of structs to be populated from a slice of map[string]interface{}
@@ -93,7 +95,7 @@ func getStructValue(structType reflect.Type, inputMap map[string]interface{}, ta
 func makeTagMap(structType reflect.Type, tags []string) map[string]string {
 	numFields := structType.NumField()
 	tagMap := make(map[string]string, numFields)
-	tags = append(tags, "json")
+	tags = append(tags, jsonTag)
 	for i := 0; i < numFields; i++ {
 		field := structType.Field(i)
 		var tagged bool
