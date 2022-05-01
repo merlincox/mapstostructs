@@ -1,6 +1,7 @@
 package mapstostructs_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,111 @@ type UserWithPointers struct {
 	Age      *int      `json:"age"`
 	Sports   *[]string `json:"sports"`
 	Location *Location `json:"location"`
+}
+
+type Recursor1 struct {
+	Simple1  Recursor2   `tag1:"simple1"`
+	Pointer1 *Recursor2  `tag1:"pointer1,omitempty"`
+	Slice1   []Recursor2 `tag1:"slice1,omitempty"`
+}
+
+type Recursor2 struct {
+	Simple2  Recursor3   `tag2:"simple2"`
+	Pointer2 *Recursor3  `tag2:"pointer2,omitempty"`
+	Slice2   []Recursor3 `tag2:"slice2,omitempty"`
+}
+
+type Recursor3 struct {
+	Field3 string `tag3:"field3"`
+}
+
+func TestRecurse(t *testing.T) {
+	in := Recursor1{
+		Simple1: Recursor2{
+			Simple2: Recursor3{
+				Field3: "val1",
+			},
+			Pointer2: &Recursor3{
+				Field3: "val2",
+			},
+			Slice2: []Recursor3{
+				{
+					Field3: "val3",
+				},
+				{
+					Field3: "val4",
+				},
+			},
+		},
+		Pointer1: &Recursor2{
+			Simple2: Recursor3{
+				Field3: "val11",
+			},
+			Pointer2: &Recursor3{
+				Field3: "val12",
+			},
+			Slice2: []Recursor3{
+				{
+					Field3: "val13",
+				},
+				{
+					Field3: "val14",
+				},
+			},
+		},
+		Slice1: []Recursor2{
+			{
+				Simple2: Recursor3{
+					Field3: "val15",
+				},
+				Pointer2: &Recursor3{
+					Field3: "val16",
+				},
+				Slice2: []Recursor3{
+					{
+						Field3: "val17",
+					},
+					{
+						Field3: "val18",
+					},
+				},
+			},
+		},
+	}
+
+	slice := make(map[string]interface{})
+	_ = json.Unmarshal(jsonMarshal(in), &slice)
+
+	var out Recursor1
+
+	err := mapstostructs.MapToStruct(slice, &out, "tag1", "tag2", "tag3")
+
+	if assert.Nil(t, err) {
+		assert.Equal(t, in.Simple1.Simple2.Field3, out.Simple1.Simple2.Field3)
+		assert.Equal(t, in.Simple1.Pointer2.Field3, out.Simple1.Pointer2.Field3)
+		if assert.Equal(t, len(in.Simple1.Slice2), len(out.Simple1.Slice2)) {
+			assert.Equal(t, in.Simple1.Slice2[0].Field3, out.Simple1.Slice2[0].Field3)
+			assert.Equal(t, in.Simple1.Slice2[1].Field3, out.Simple1.Slice2[1].Field3)
+		}
+		assert.Equal(t, in.Pointer1.Simple2.Field3, out.Pointer1.Simple2.Field3)
+		assert.Equal(t, in.Pointer1.Pointer2.Field3, out.Pointer1.Pointer2.Field3)
+		if assert.Equal(t, len(in.Pointer1.Slice2), len(out.Pointer1.Slice2)) {
+			assert.Equal(t, in.Pointer1.Slice2[0].Field3, out.Pointer1.Slice2[0].Field3)
+			assert.Equal(t, in.Pointer1.Slice2[1].Field3, out.Pointer1.Slice2[1].Field3)
+		}
+		if assert.Equal(t, len(in.Slice1), len(out.Slice1)) {
+			assert.Equal(t, in.Slice1[0].Simple2.Field3, out.Slice1[0].Simple2.Field3)
+			if assert.Equal(t, len(in.Slice1[0].Slice2), len(out.Slice1[0].Slice2)) {
+				assert.Equal(t, in.Slice1[0].Slice2[0].Field3, out.Slice1[0].Slice2[0].Field3)
+				assert.Equal(t, in.Slice1[0].Slice2[1].Field3, out.Slice1[0].Slice2[1].Field3)
+			}
+		}
+	}
+}
+
+func jsonMarshal(in interface{}) []byte {
+	bytes, _ := json.Marshal(in)
+	return bytes
 }
 
 func TestMapsToStructsSimple(t *testing.T) {
