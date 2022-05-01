@@ -408,7 +408,7 @@ func TestMapsToStructsPointerBadMap(t *testing.T) {
 	}
 }
 
-func TestMapsToStructsPointerBadReceiver1(t *testing.T) {
+func TestMapsToStructsBadReceiver1(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19},
 		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
@@ -424,7 +424,7 @@ func TestMapsToStructsPointerBadReceiver1(t *testing.T) {
 	}
 }
 
-func TestMapsToStructsPointerBadReceiver2(t *testing.T) {
+func TestMapsToStructsBadReceiver2(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19},
 		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
@@ -441,7 +441,7 @@ func TestMapsToStructsPointerBadReceiver2(t *testing.T) {
 	}
 }
 
-func TestMapsToStructsPointerBadReceiver3(t *testing.T) {
+func TestMapsToStructsBadReceiver3(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19},
 		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
@@ -454,6 +454,29 @@ func TestMapsToStructsPointerBadReceiver3(t *testing.T) {
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
 		expected := "the receivers argument must be a ptr to a slice of struct but a ptr to a slice of string was given"
+		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
+	}
+}
+
+func TestMapToStructBadReceiver1(t *testing.T) {
+	map1 := map[string]interface{}{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19}
+
+	err := mapstostructs.MapToStruct(map1, "test")
+
+	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
+		expected := "the receiver argument must be a ptr to a struct but a string was given"
+		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
+	}
+}
+
+func TestMapToStructBadReceiver2(t *testing.T) {
+	map1 := map[string]interface{}{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19}
+
+	test := "test"
+	err := mapstostructs.MapToStruct(map1, &test)
+
+	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
+		expected := "the receiver argument must be a ptr to a struct but a ptr to a string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
