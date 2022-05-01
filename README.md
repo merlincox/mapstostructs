@@ -1,8 +1,10 @@
 # mapstostructs
 
-A simple utility function to convert from `map[string]interface{}` to a slice of structs, with the option to specify alternative tags for the map keys.
+A simple utility function to convert from `[]map[string]interface{}` into a slice of structs or from `map[string]interface{}` into a struct, with the option to specify alternative tags for the mapping keys.
 
 Type conversions to the struct type are performed where permitted by the `reflect` library. This helps with the situation where integer values have been JSON-unmarshalled into `float64` values in a map.
+
+There is support for `map[string]interface{}` to struct conversions embedded within the map(s), limited by the depth of the embedding.
 
 ```go
 package main
@@ -23,19 +25,18 @@ type User struct {
 }
 
 type Location struct {
-	Country string `json:"country"`
+	Country string `json:"country" alias:"nation"`
 	City    string `json:"city"`
 }
 
 func main() {
-
-
+	
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "sex": "male", "age": 19,
 			"sports": []string{"football", "tennis"},
-			"location": Location{
-				Country: "UK",
-				City:    "London",
+			"location": map[string]interface{}{
+				"nation": "UK",
+				"city":    "London",
 			}},
 		{"id": 56, "name": "Zhangsan", "sex": "male", "age": 37},
 		{"id": 7, "name": "Lisi", "sex": "female", "age": 54},
