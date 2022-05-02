@@ -9,7 +9,8 @@ import (
 const (
 	badReceiversMsg    = "the receivers argument must be a ptr to a slice of struct but a %s was given"
 	badReceiverMsg     = "the receiver argument must be a ptr to a struct but a %s was given"
-	badFieldMsg        = "the %s field for a struct of type %s must be of type %s but received a value of type %s"
+	badFieldMsg        = "the %%s field for a struct of type %%s must be of type %s but received a value of type %s"
+	badFieldMsgOld     = "the %s field for a struct of type %s must be of type %s but received a value of type %s"
 	badFieldMsgWithRow = "%s in row %d"
 
 	jsonTag = "json"
@@ -39,7 +40,7 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 		return fmt.Errorf(badReceiversMsg, "ptr to a slice of "+structType.Kind().String())
 	}
 
-	return setSliceOfStructs(reflect.ValueOf(receivers).Elem(), structType, inputMaps, tags)
+	return setSlice(reflect.ValueOf(receivers).Elem(), structType, inputMaps, tags)
 }
 
 // MapToStruct provides functionality for a struct to be populated from a map[string]interface{} with the option of
@@ -75,10 +76,12 @@ func MapToStruct(inputMap map[string]interface{}, receiver interface{}, tags ...
 func getStructValue(structType reflect.Type, inputMap map[string]interface{}, tagMap map[string]string, tags []string) (reflect.Value, error) {
 	structValue := reflect.Indirect(reflect.New(structType))
 	for key, mapValue := range inputMap {
-		if fieldName, ok := tagMap[strings.ToLower(key)]; ok {
-			err := setStructField(structValue.Addr().Interface(), fieldName, mapValue, tags)
-			if err != nil {
-				return reflect.Value{}, err
+		if mapValue != nil {
+			if fieldName, ok := tagMap[strings.ToLower(key)]; ok {
+				err := setStructField(structValue.Addr().Interface(), fieldName, mapValue, tags)
+				if err != nil {
+					return reflect.Value{}, err
+				}
 			}
 		}
 	}
@@ -109,6 +112,19 @@ func makeTagMap(structType reflect.Type, tags []string) map[string]string {
 }
 
 func setStructField(object interface{}, fieldName string, mapValue interface{}, tags []string) error {
+	field := reflect.ValueOf(object).Elem().FieldByName(fieldName)
+	value := reflect.ValueOf(mapValue)
+	structName := reflect.ValueOf(object).Elem().Type().Name()
+
+	if err := setRecursively(field, value, tags); err != nil {
+
+		return fmt.Errorf(err.Error(), fieldName, structName)
+	}
+
+	return nil
+}
+
+func setStructFieldOld(object interface{}, fieldName string, mapValue interface{}, tags []string) error {
 	field := reflect.ValueOf(object).Elem().FieldByName(fieldName)
 	value := reflect.ValueOf(mapValue)
 	structName := reflect.ValueOf(object).Elem().Type().Name()
@@ -158,36 +174,127 @@ func setStructFieldRecursively(field reflect.Value, value reflect.Value, structN
 		}
 	}
 
-	if wantType.Kind() == reflect.Slice && wantType.Elem().Kind() == reflect.Struct {
-		if inputMaps, ok := remapInterfaces(value); ok {
+	if wantType.Kind() == reflect.Slice {
+		if inputMaps, ok := interfacesToMapInterfaces(value); ok {
 
-			return setSliceOfStructs(field, wantType.Elem(), inputMaps, tags)
+			return setSlice(field, wantType.Elem(), inputMaps, tags)
 		}
 	}
 
-	return fmt.Errorf(badFieldMsg, fieldName, structName, want, have)
+	if wantType.Kind() == reflect.Map && wantType.Key().Kind() == reflect.String {
+		mapToSet := reflect.MakeMap(wantType)
+
+		if innerMap, ok := value.Interface().(map[string]interface{}); ok {
+			for key, mapValue := range innerMap {
+
+				valueToSet := reflect.Indirect(reflect.New(wantType.Elem()))
+
+				setStructFieldRecursively(valueToSet, reflect.ValueOf(mapValue), structName, fieldName, tags)
+
+				mapToSet.SetMapIndex(reflect.ValueOf(key), valueToSet)
+			}
+			setValue(field, mapToSet)
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf(badFieldMsgOld, fieldName, structName, want, have)
 }
 
-func setSliceOfStructs(receivingValue reflect.Value, structType reflect.Type, inputMaps []map[string]interface{}, tags []string) error {
+func setRecursively(field reflect.Value, value reflect.Value, tags []string) error {
+	if value.Kind() == reflect.Invalid {
+
+		return nil
+	}
+	if value.Type().Kind() == reflect.Ptr {
+
+		return setRecursively(field, value.Elem(), tags)
+	}
+	have := value.Kind().String()
+	wantType := field.Type()
+	if wantType.Kind() == reflect.Ptr {
+		wantType = wantType.Elem()
+	}
+	want := wantType.Kind().String()
+
+	if value.Type() == wantType {
+		setValue(field, value)
+
+		return nil
+	}
+
+	if value.CanConvert(wantType) {
+		setValue(field, value.Convert(wantType))
+
+		return nil
+	}
+
+	if wantType.Kind() == reflect.Struct {
+		if innerMap, ok := value.Interface().(map[string]interface{}); ok {
+			tagMap := makeTagMap(wantType, tags)
+			structValue, err := getStructValue(wantType, innerMap, tagMap, tags)
+			if err != nil {
+
+				return err
+			}
+			setValue(field, structValue)
+
+			return nil
+		}
+	}
+
+	if wantType.Kind() == reflect.Slice {
+		if inputMaps, ok := interfacesToMapInterfaces(value); ok {
+
+			return setSlice(field, wantType.Elem(), inputMaps, tags)
+		}
+	}
+
+	if wantType.Kind() == reflect.Map && wantType.Key().Kind() == reflect.String {
+		mapToSet := reflect.MakeMap(wantType)
+
+		if innerMap, ok := value.Interface().(map[string]interface{}); ok {
+			for key, mapValue := range innerMap {
+
+				valueToSet := reflect.Indirect(reflect.New(wantType.Elem()))
+
+				if err := setRecursively(valueToSet, reflect.ValueOf(mapValue), tags); err != nil {
+
+					return err
+				}
+
+				mapToSet.SetMapIndex(reflect.ValueOf(key), valueToSet)
+			}
+			setValue(field, mapToSet)
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf(badFieldMsg, want, have)
+}
+
+func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []map[string]interface{}, tags []string) error {
 	if len(inputMaps) == 0 {
 		return nil
 	}
-	tagMap := makeTagMap(structType, tags)
-	structValues := reflect.MakeSlice(reflect.SliceOf(structType), 0, len(inputMaps))
+	tagMap := makeTagMap(wantType, tags)
+	sliceValues := reflect.MakeSlice(reflect.SliceOf(wantType), 0, len(inputMaps))
 
 	for i, inputMap := range inputMaps {
-		structValue, err := getStructValue(structType, inputMap, tagMap, tags)
+		structValue, err := getStructValue(wantType, inputMap, tagMap, tags)
 		if err != nil {
 			return fmt.Errorf(badFieldMsgWithRow, err.Error(), i+1)
 		}
-		structValues = reflect.Append(structValues, structValue)
+		sliceValues = reflect.Append(sliceValues, structValue)
 	}
-	setValue(receivingValue, structValues)
+	setValue(receivingValue, sliceValues)
 
 	return nil
 }
 
-func remapInterfaces(value reflect.Value) ([]map[string]interface{}, bool) {
+func interfacesToMapInterfaces(value reflect.Value) ([]map[string]interface{}, bool) {
 	inputs, ok := value.Interface().([]interface{})
 	if !ok {
 		return nil, false
