@@ -3,6 +3,7 @@ package mapstostructs
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -91,7 +92,7 @@ func setStruct(receivingValue reflect.Value, wantType reflect.Type, inputMap map
 	structValue := reflect.Indirect(reflect.New(wantType))
 	for key, mapValue := range inputMap {
 		if mapValue != nil {
-			if fieldName, ok := tagMap[strings.ToLower(key)]; ok {
+			if fieldName, ok := tagMap[key]; ok {
 				err := setStructField(structValue.Addr().Interface(), fieldName, mapValue, tags)
 				if err != nil {
 					return err
@@ -163,12 +164,6 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 
 func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
 	wantKeyType := wantType.Key()
-	if wantKeyType != inputValue.Type().Key() {
-		want := wantType.String()
-		have := inputValue.Type().String()
-
-		return fmt.Errorf(badFieldMsg, want, have)
-	}
 	if inputValue.Len() == 0 {
 
 		return nil
@@ -177,7 +172,14 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 	mapRange := inputValue.MapRange()
 
 	for mapRange.Next() {
-		keyToSet, _ := convertValuetoType(mapRange.Key(), wantKeyType)
+		keyToSet, ok := convertValuetoType(mapRange.Key(), wantKeyType)
+		if !ok {
+			want := wantType.String()
+			have := inputValue.Type().String()
+
+			return fmt.Errorf(badFieldMsg, want, have)
+		}
+
 		valueToSet := reflect.Indirect(reflect.New(wantType.Elem()))
 		if err := setRecursively(valueToSet, mapRange.Value(), tags); err != nil {
 
@@ -198,6 +200,17 @@ func convertValuetoType(value reflect.Value, wantType reflect.Type) (reflect.Val
 	if value.CanConvert(wantType) {
 
 		return value.Convert(wantType), true
+	}
+
+	// supports JSON int to string conversions for maps with integer keys
+	if wantType.Kind() == reflect.Int && value.Type().Kind() == reflect.String {
+		intval, err := strconv.Atoi(value.Interface().(string))
+		if err != nil {
+
+			return reflect.Value{}, false
+		}
+
+		return reflect.ValueOf(intval), true
 	}
 
 	return reflect.Value{}, false
