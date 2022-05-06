@@ -133,14 +133,8 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 	}
 	want := wantType.String()
 
-	if value.Type() == wantType {
-		setValue(receivingValue, value)
-
-		return nil
-	}
-
-	if value.CanConvert(wantType) {
-		setValue(receivingValue, value.Convert(wantType))
+	if valueToSet, ok := convertValuetoType(value, wantType); ok {
+		setValue(receivingValue, valueToSet)
 
 		return nil
 	}
@@ -159,31 +153,54 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 		}
 	}
 
-	if wantType.Kind() == reflect.Map && wantType.Key().Kind() == reflect.String {
-		if inputMap, ok := value.Interface().(map[string]interface{}); ok {
+	if wantType.Kind() == reflect.Map && value.Type().Kind() == reflect.Map {
 
-			return setMap(receivingValue, wantType, inputMap, tags)
-		}
-
-		return nil
+		return setMap(receivingValue, wantType, value, tags)
 	}
 
 	return fmt.Errorf(badFieldMsg, want, have)
 }
 
-func setMap(receivingValue reflect.Value, wantType reflect.Type, inputMap map[string]interface{}, tags []string) error {
+func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
+	wantKeyType := wantType.Key()
+	if wantKeyType != inputValue.Type().Key() {
+		want := wantType.String()
+		have := inputValue.Type().String()
+
+		return fmt.Errorf(badFieldMsg, want, have)
+	}
+	if inputValue.Len() == 0 {
+
+		return nil
+	}
 	mapToSet := reflect.MakeMap(wantType)
-	for key, mapValue := range inputMap {
+	mapRange := inputValue.MapRange()
+
+	for mapRange.Next() {
+		keyToSet, _ := convertValuetoType(mapRange.Key(), wantKeyType)
 		valueToSet := reflect.Indirect(reflect.New(wantType.Elem()))
-		if err := setRecursively(valueToSet, reflect.ValueOf(mapValue), tags); err != nil {
+		if err := setRecursively(valueToSet, mapRange.Value(), tags); err != nil {
 
 			return err
 		}
-		mapToSet.SetMapIndex(reflect.ValueOf(key), valueToSet)
+		mapToSet.SetMapIndex(keyToSet, valueToSet)
 	}
 	setValue(receivingValue, mapToSet)
 
 	return nil
+}
+
+func convertValuetoType(value reflect.Value, wantType reflect.Type) (reflect.Value, bool) {
+	if value.Type() == wantType {
+
+		return value, true
+	}
+	if value.CanConvert(wantType) {
+
+		return value.Convert(wantType), true
+	}
+
+	return reflect.Value{}, false
 }
 
 func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []map[string]interface{}, tags []string) error {
