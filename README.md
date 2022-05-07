@@ -1,10 +1,14 @@
 # mapstostructs
 
-A simple utility function to convert from `[]map[string]interface{}` into a slice of structs or from `map[string]interface{}` into a struct, with the option to specify alternative tags for the mapping keys.
+A simple utility function to convert from `[]map[string]interface{}` into a slice of structs or from a `map[string]interface{}` into a struct, with the option to specify alternative tags for the mapping keys.
 
 Type conversions to the struct type are performed where permitted by the `reflect` library. This helps with the situation where integer values have been JSON-unmarshalled into `float64` values in a map.
 
-There is support for `map[string]interface{}` to struct conversions embedded within the map(s), limited by the depth of the embedding.
+There is support for `map[string]interface{}` to struct conversions embedded within the map(s).
+
+There is also support for `map[string]interface{}` to `map[`{numeric}`]interface{}` where numeric is of `int`, `int64`, `int32`, `int16`, `int8`, `uint`, `uint64`, `uint32`, `uint16`, `uint8`, `float64` or `float32` type.
+
+This is to support the situation where a map with numeric keys has been converted to a JSON representation with string keys.
 
 ```go
 package main
