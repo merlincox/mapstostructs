@@ -40,23 +40,39 @@ type UserWithPointers struct {
 }
 
 type Recursor1 struct {
-	Simple1  Recursor2   `tag1:"simple1"`
-	Pointer1 *Recursor2  `tag1:"pointer1,omitempty"`
-	Slice1   []Recursor2 `tag1:"slice1,omitempty"`
+	Simple1  Recursor2            `json:"simple1"`
+	Pointer1 *Recursor2           `json:"pointer1,omitempty"`
+	Slice1   []Recursor2          `json:"slice1,omitempty"`
+	Map1     map[string]Recursor2 `json:"map1,omitempty"`
+	IntMap1  map[int]Recursor2    `json:"intMap1,omitempty"`
 }
 
 type Recursor2 struct {
-	Simple2  Recursor3   `tag2:"simple2"`
-	Pointer2 *Recursor3  `tag2:"pointer2,omitempty"`
-	Slice2   []Recursor3 `tag2:"slice2,omitempty"`
+	Simple2  Recursor3   `json:"simple2"`
+	Pointer2 *Recursor3  `json:"pointer2,omitempty"`
+	Slice2   []Recursor3 `json:"slice2,omitempty"`
 }
 
 type Recursor3 struct {
-	Field3 string `tag3:"field3"`
+	Field3 string `json:"field3"`
 }
 
 func TestRecurse(t *testing.T) {
 	in := Recursor1{
+		Map1: map[string]Recursor2{
+			"key1": {
+				Simple2: Recursor3{
+					Field3: "val19",
+				},
+			},
+		},
+		IntMap1: map[int]Recursor2{
+			1: {
+				Simple2: Recursor3{
+					Field3: "val20",
+				},
+			},
+		},
 		Simple1: Recursor2{
 			Simple2: Recursor3{
 				Field3: "val1",
@@ -109,14 +125,16 @@ func TestRecurse(t *testing.T) {
 		},
 	}
 
-	slice := make(map[string]interface{})
-	_ = json.Unmarshal(jsonMarshal(in), &slice)
+	mapi := make(map[string]interface{})
+	_ = json.Unmarshal(jsonMarshal(in), &mapi)
 
 	var out Recursor1
 
-	err := mapstostructs.MapToStruct(slice, &out, "tag1", "tag2", "tag3")
+	err := mapstostructs.MapToStruct(mapi, &out)
 
 	if assert.Nil(t, err) {
+		assert.Equal(t, out.Map1["key1"].Simple2.Field3, in.Map1["key1"].Simple2.Field3)
+		assert.Equal(t, out.IntMap1[1].Simple2.Field3, in.IntMap1[1].Simple2.Field3)
 		assert.Equal(t, in.Simple1.Simple2.Field3, out.Simple1.Simple2.Field3)
 		assert.Equal(t, in.Simple1.Pointer2.Field3, out.Simple1.Pointer2.Field3)
 		if assert.Equal(t, len(in.Simple1.Slice2), len(out.Simple1.Slice2)) {
@@ -376,7 +394,7 @@ func TestMapsToStructsBadMap(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19},
 		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
-		{"id": "7", "name": "Lisi", "gender": "female", "age": 54},
+		{"id": "invalid", "name": "Lisi", "gender": "female", "age": 54},
 		{"id": 978, "name": "Wangwu", "gender": "male", "age": 28},
 	}
 
