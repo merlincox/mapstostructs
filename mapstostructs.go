@@ -26,6 +26,8 @@ const (
 // situation where integer values have been JSON-unmarshalled into float64 values in a map.
 //
 // Conversion of map[string]interface() to struct embedded within the slice of map[string]interface{} is permitted.
+//
+// Maps with numeric keys will accept string representations of numeric values.
 func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, tags ...string) error {
 	if reflect.ValueOf(receivers).Kind() != reflect.Ptr {
 		return fmt.Errorf(badReceiversMsg, reflect.ValueOf(receivers).Kind().String())
@@ -52,6 +54,8 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 // situation where integer values have been JSON-unmarshalled into float64 values in a map.
 //
 // Conversion of map[string]interface() to struct embedded within the map[string]interface{} is permitted.
+//
+// Maps with numeric keys will accept string representations of numeric values.
 func MapToStruct(inputMap map[string]interface{}, receiver interface{}, tags ...string) error {
 	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
 		return fmt.Errorf(badReceiverMsg, reflect.ValueOf(receiver).Kind().String())
@@ -134,7 +138,7 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 	}
 	want := wantType.String()
 
-	if valueToSet, ok := convertValuetoType(value, wantType); ok {
+	if valueToSet, ok := convertToType(value, wantType, false); ok {
 		setValue(receivingValue, valueToSet)
 
 		return nil
@@ -172,7 +176,7 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 	mapRange := inputValue.MapRange()
 
 	for mapRange.Next() {
-		keyToSet, ok := convertValuetoType(mapRange.Key(), wantKeyType)
+		keyToSet, ok := convertToType(mapRange.Key(), wantKeyType, true)
 		if !ok {
 			want := wantType.String()
 			have := inputValue.Type().String()
@@ -192,7 +196,7 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 	return nil
 }
 
-func convertValuetoType(value reflect.Value, wantType reflect.Type) (reflect.Value, bool) {
+func convertToType(value reflect.Value, wantType reflect.Type, mapIndex bool) (reflect.Value, bool) {
 	if value.Type() == wantType {
 
 		return value, true
@@ -202,18 +206,64 @@ func convertValuetoType(value reflect.Value, wantType reflect.Type) (reflect.Val
 		return value.Convert(wantType), true
 	}
 
-	// supports JSON int to string conversions for maps with integer keys
-	if wantType.Kind() == reflect.Int && value.Type().Kind() == reflect.String {
-		intval, err := strconv.Atoi(value.Interface().(string))
+	if mapIndex && value.Type().Kind() == reflect.String {
+		// support reverse string to number conversions for maps with numeric keys converted to strings in JSON representations
+		var (
+			convertedVal reflect.Value
+			err          error
+			int64val     int64
+			uint64val    uint64
+			float64val   float64
+		)
+
+		if isInt(wantType) {
+			int64val, err = strconv.ParseInt(value.Interface().(string), 10, 64)
+
+			if err == nil {
+				convertedVal = reflect.ValueOf(int64val)
+			}
+		}
+
+		if isUint(wantType) {
+			uint64val, err = strconv.ParseUint(value.Interface().(string), 10, 64)
+
+			if err == nil {
+				convertedVal = reflect.ValueOf(uint64val)
+			}
+		}
+
+		if isFloat(wantType) {
+			float64val, err = strconv.ParseFloat(value.Interface().(string), 64)
+
+			if err == nil {
+				convertedVal = reflect.ValueOf(float64val)
+			}
+		}
+
 		if err != nil {
 
 			return reflect.Value{}, false
 		}
 
-		return reflect.ValueOf(intval), true
+		return convertToType(convertedVal, wantType, false)
 	}
 
 	return reflect.Value{}, false
+}
+
+func isFloat(wantType reflect.Type) bool {
+
+	return wantType.Kind() >= reflect.Float32 && wantType.Kind() <= reflect.Float64
+}
+
+func isInt(wantType reflect.Type) bool {
+
+	return wantType.Kind() >= reflect.Int && wantType.Kind() <= reflect.Int64
+}
+
+func isUint(wantType reflect.Type) bool {
+
+	return wantType.Kind() >= reflect.Uint && wantType.Kind() <= reflect.Uint64
 }
 
 func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []map[string]interface{}, tags []string) error {
