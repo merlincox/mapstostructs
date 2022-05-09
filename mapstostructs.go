@@ -12,6 +12,7 @@ const (
 	badReceiverMsg     = "the receiver argument must be a ptr to a struct but a %s was given"
 	badFieldMsg        = "the %%s field for a struct of type %%s must be of type %s but received a value of type %s"
 	badFieldMsgWithRow = "%s in row %d"
+	badKeyMsg          = "the map key must be convertible to %s but received '%s'"
 
 	jsonTag = "json"
 )
@@ -43,6 +44,20 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 
 	return setSlice(reflect.ValueOf(receivers).Elem(), structType, inputMaps, tags)
 }
+
+func MapToMap(inputMap map[string]interface{}, receiver interface{}, tags ...string) error {
+	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
+		return fmt.Errorf(badReceiversMsg, reflect.ValueOf(receiver).Kind().String())
+	}
+	mapValue := reflect.Indirect(reflect.ValueOf(receiver))
+	if mapValue.Kind() != reflect.Map {
+		return fmt.Errorf(badReceiversMsg, "ptr to a "+mapValue.Kind().String())
+	}
+
+	return setMap(reflect.ValueOf(receiver).Elem(), mapValue.Type(), reflect.ValueOf(inputMap), tags)
+}
+
+//func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
 
 // MapToStruct provides functionality for a struct to be populated from a map[string]interface{} with the option of
 // passing alternative struct tags to use as map keys. If no tags are specified the json tag is used and if that is not
@@ -88,6 +103,7 @@ func makeTagMap(structType reflect.Type, tags []string) map[string]string {
 			tagMap[strings.ToLower(field.Name)] = field.Name
 		}
 	}
+
 	return tagMap
 }
 
@@ -178,10 +194,10 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 	for mapRange.Next() {
 		keyToSet, ok := convertToType(mapRange.Key(), wantKeyType, true)
 		if !ok {
-			want := wantType.String()
-			have := inputValue.Type().String()
+			want := wantKeyType.String()
+			have := mapRange.Key().Interface()
 
-			return fmt.Errorf(badFieldMsg, want, have)
+			return fmt.Errorf(badKeyMsg, want, have)
 		}
 
 		valueToSet := reflect.Indirect(reflect.New(wantType.Elem()))
@@ -197,50 +213,61 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 }
 
 func convertToType(value reflect.Value, wantType reflect.Type, mapIndex bool) (reflect.Value, bool) {
+
 	if value.Type() == wantType {
 
 		return value, true
 	}
-	if value.CanConvert(wantType) {
+
+	// number to string conversions will produce ASCII values and are not wanted
+	if wantType.Kind() != reflect.String && value.CanConvert(wantType) {
 
 		return value.Convert(wantType), true
 	}
 
+	if value.Type().Kind() == reflect.Interface {
+
+		return convertToType(value.Elem(), wantType, mapIndex)
+	}
+
 	if mapIndex && value.Type().Kind() == reflect.String {
-		// support reverse string to number conversions for maps with numeric keys converted to strings in JSON representations
-		var (
-			convertedVal reflect.Value
-			err          error
-			int64val     int64
-			uint64val    uint64
-			float64val   float64
-		)
+		// support reverse string to number conversions for maps with numeric keys converted to strings
+		// in JSON representations
+		var convertedVal reflect.Value
+		stringVar := value.Interface().(string)
+		switch wantType.Kind() {
 
-		if isInt(wantType) {
-			int64val, err = strconv.ParseInt(value.Interface().(string), 10, 64)
+		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+			int64Var, err := strconv.ParseInt(stringVar, 10, 64)
 
-			if err == nil {
-				convertedVal = reflect.ValueOf(int64val)
+			if err != nil {
+
+				return reflect.Value{}, false
 			}
-		}
 
-		if isUint(wantType) {
-			uint64val, err = strconv.ParseUint(value.Interface().(string), 10, 64)
+			convertedVal = reflect.ValueOf(int64Var)
 
-			if err == nil {
-				convertedVal = reflect.ValueOf(uint64val)
+		case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+			uint64Var, err := strconv.ParseUint(stringVar, 10, 64)
+
+			if err != nil {
+
+				return reflect.Value{}, false
 			}
-		}
 
-		if isFloat(wantType) {
-			float64val, err = strconv.ParseFloat(value.Interface().(string), 64)
+			convertedVal = reflect.ValueOf(uint64Var)
 
-			if err == nil {
-				convertedVal = reflect.ValueOf(float64val)
+		case reflect.Float64, reflect.Float32:
+			float64Var, err := strconv.ParseFloat(stringVar, 64)
+
+			if err != nil {
+
+				return reflect.Value{}, false
 			}
-		}
 
-		if err != nil {
+			convertedVal = reflect.ValueOf(float64Var)
+
+		default:
 
 			return reflect.Value{}, false
 		}
@@ -249,21 +276,6 @@ func convertToType(value reflect.Value, wantType reflect.Type, mapIndex bool) (r
 	}
 
 	return reflect.Value{}, false
-}
-
-func isFloat(wantType reflect.Type) bool {
-
-	return wantType.Kind() >= reflect.Float32 && wantType.Kind() <= reflect.Float64
-}
-
-func isInt(wantType reflect.Type) bool {
-
-	return wantType.Kind() >= reflect.Int && wantType.Kind() <= reflect.Int64
-}
-
-func isUint(wantType reflect.Type) bool {
-
-	return wantType.Kind() >= reflect.Uint && wantType.Kind() <= reflect.Uint64
 }
 
 func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []map[string]interface{}, tags []string) error {
