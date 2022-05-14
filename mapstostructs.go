@@ -8,11 +8,15 @@ import (
 )
 
 const (
-	badReceiversMsg    = "the receivers argument must be a ptr to a slice of struct but a %s was given"
-	badReceiverMsg     = "the receiver argument must be a ptr to a struct but a %s was given"
-	badFieldMsg        = "the %%s field for a struct of type %%s must be of type %s but received a value of type %s"
-	badFieldMsgWithRow = "%s in row %d"
-	badKeyMsg          = "the map key must be convertible to %s but received '%s'"
+	notStructSliceReceiversMsg = "the receivers argument must be a ptr to a slice of struct but a %s was given"
+	notStructReceiverMsg       = "the receiver argument must be a ptr to a struct but a %s was given"
+	notMapReceiverMsg          = "the receiver argument must be a ptr to a map but a %s was given"
+
+	badValueMsg    = "must be or be convertible to %s type, but received '%v'"
+	structPrefix   = "the %s field for a struct of type %s "
+	rowSuffix      = " in row %d"
+	mapKeyPrefix   = "the map key for a %s "
+	mapValuePrefix = "the map value for a %s "
 
 	jsonTag = "json"
 )
@@ -31,33 +35,19 @@ const (
 // Maps with numeric keys will accept string representations of numeric values.
 func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, tags ...string) error {
 	if reflect.ValueOf(receivers).Kind() != reflect.Ptr {
-		return fmt.Errorf(badReceiversMsg, reflect.ValueOf(receivers).Kind().String())
+		return fmt.Errorf(notStructSliceReceiversMsg, reflect.ValueOf(receivers).Kind().String())
 	}
 	structValues := reflect.Indirect(reflect.ValueOf(receivers))
 	if structValues.Kind() != reflect.Slice {
-		return fmt.Errorf(badReceiversMsg, "ptr to a "+structValues.Kind().String())
+		return fmt.Errorf(notStructSliceReceiversMsg, "ptr to a "+structValues.Kind().String())
 	}
 	structType := structValues.Type().Elem()
 	if structType.Kind() != reflect.Struct {
-		return fmt.Errorf(badReceiversMsg, "ptr to a slice of "+structType.Kind().String())
+		return fmt.Errorf(notStructSliceReceiversMsg, "ptr to a slice of "+structType.Kind().String())
 	}
 
 	return setSlice(reflect.ValueOf(receivers).Elem(), structType, inputMaps, tags)
 }
-
-func MapToMap(inputMap map[string]interface{}, receiver interface{}, tags ...string) error {
-	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
-		return fmt.Errorf(badReceiversMsg, reflect.ValueOf(receiver).Kind().String())
-	}
-	mapValue := reflect.Indirect(reflect.ValueOf(receiver))
-	if mapValue.Kind() != reflect.Map {
-		return fmt.Errorf(badReceiversMsg, "ptr to a "+mapValue.Kind().String())
-	}
-
-	return setMap(reflect.ValueOf(receiver).Elem(), mapValue.Type(), reflect.ValueOf(inputMap), tags)
-}
-
-//func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
 
 // MapToStruct provides functionality for a struct to be populated from a map[string]interface{} with the option of
 // passing alternative struct tags to use as map keys. If no tags are specified the json tag is used and if that is not
@@ -73,14 +63,38 @@ func MapToMap(inputMap map[string]interface{}, receiver interface{}, tags ...str
 // Maps with numeric keys will accept string representations of numeric values.
 func MapToStruct(inputMap map[string]interface{}, receiver interface{}, tags ...string) error {
 	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
-		return fmt.Errorf(badReceiverMsg, reflect.ValueOf(receiver).Kind().String())
+		return fmt.Errorf(notStructReceiverMsg, reflect.ValueOf(receiver).Kind().String())
 	}
 	structType := reflect.Indirect(reflect.ValueOf(receiver)).Type()
 	if structType.Kind() != reflect.Struct {
-		return fmt.Errorf(badReceiverMsg, "ptr to a "+structType.Kind().String())
+		return fmt.Errorf(notStructReceiverMsg, "ptr to a "+structType.Kind().String())
 	}
 
 	return setStruct(reflect.ValueOf(receiver).Elem(), structType, inputMap, tags)
+}
+
+// MapToMap allows a map to be populated from another map, allowing key and value conversions where these are
+// possible with the option of passing alternative struct tags to use as map keys. If no tags are specified the json
+// tag is used and if that is not present, the lowercase value of the struct field is assumed.
+//
+// The receiver argument must be a pointer to a map.
+//
+// Type conversions to the struct type are performed where permitted by the reflect library. This helps with the
+// situation where integer values have been JSON-unmarshalled into float64 values in a map.
+//
+// Conversion of map[string]interface() to struct embedded within the map[string]interface{} is permitted.
+//
+// Maps with numeric keys will accept string representations of numeric values.
+func MapToMap(inputMap map[interface{}]interface{}, receiver interface{}, tags ...string) error {
+	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
+		return fmt.Errorf(notMapReceiverMsg, reflect.ValueOf(receiver).Kind().String())
+	}
+	mapValue := reflect.Indirect(reflect.ValueOf(receiver))
+	if mapValue.Kind() != reflect.Map {
+		return fmt.Errorf(notMapReceiverMsg, "ptr to a "+mapValue.Kind().String())
+	}
+
+	return setMap(reflect.ValueOf(receiver).Elem(), mapValue.Type(), reflect.ValueOf(inputMap), tags)
 }
 
 func makeTagMap(structType reflect.Type, tags []string) map[string]string {
@@ -132,7 +146,7 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 
 	if err := setRecursively(field, value, tags); err != nil {
 
-		return fmt.Errorf(err.Error(), fieldName, structName)
+		return fmt.Errorf(structPrefix+err.Error(), fieldName, structName)
 	}
 
 	return nil
@@ -147,7 +161,7 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 
 		return setRecursively(receivingValue, value.Elem(), tags)
 	}
-	have := value.Type().String()
+	have := value.Interface()
 	wantType := receivingValue.Type()
 	if wantType.Kind() == reflect.Ptr {
 		wantType = wantType.Elem()
@@ -179,7 +193,7 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 		return setMap(receivingValue, wantType, value, tags)
 	}
 
-	return fmt.Errorf(badFieldMsg, want, have)
+	return fmt.Errorf(badValueMsg, want, have)
 }
 
 func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
@@ -197,13 +211,13 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 			want := wantKeyType.String()
 			have := mapRange.Key().Interface()
 
-			return fmt.Errorf(badKeyMsg, want, have)
+			return fmt.Errorf(mapKeyPrefix+badValueMsg, wantType.String(), want, have)
 		}
 
 		valueToSet := reflect.Indirect(reflect.New(wantType.Elem()))
 		if err := setRecursively(valueToSet, mapRange.Value(), tags); err != nil {
 
-			return err
+			return fmt.Errorf(mapValuePrefix+err.Error(), wantType.String())
 		}
 		mapToSet.SetMapIndex(keyToSet, valueToSet)
 	}
@@ -284,7 +298,7 @@ func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []m
 		valueToSet := reflect.Indirect(reflect.New(wantType))
 		if err := setRecursively(valueToSet, reflect.ValueOf(inputMap), tags); err != nil {
 
-			return fmt.Errorf(badFieldMsgWithRow, err.Error(), i+1)
+			return fmt.Errorf(err.Error()+rowSuffix, i+1)
 		}
 		sliceValues = reflect.Append(sliceValues, valueToSet)
 	}

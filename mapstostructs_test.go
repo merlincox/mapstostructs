@@ -403,7 +403,7 @@ func TestMapsToStructsBadMap(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, &users)
 
 	if assert.NotNil(t, err, "error should not be nil with invalid data") {
-		expected := "the ID field for a struct of type User must be of type int but received a value of type string in row 3"
+		expected := "the ID field for a struct of type User must be or be convertible to int type, but received 'invalid' in row 3"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
@@ -412,7 +412,7 @@ func TestMapsToStructsPointerBadMap(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19},
 		{"id": 56, "name": "Zhangsan", "gender": "male", "age": 37},
-		{"id": 7, "name": "Lisi", "gender": "female", "age": "54"},
+		{"id": 7, "name": "Lisi", "gender": "female", "age": "invalid"},
 		{"id": 978, "name": "Wangwu", "gender": "male", "age": 28},
 	}
 
@@ -421,7 +421,7 @@ func TestMapsToStructsPointerBadMap(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, &users)
 
 	if assert.NotNil(t, err, "error should not be nil with invalid data") {
-		expected := "the Age field for a struct of type UserWithPointers must be of type int but received a value of type string in row 3"
+		expected := "the Age field for a struct of type UserWithPointers must be or be convertible to int type, but received 'invalid' in row 3"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
@@ -521,5 +521,59 @@ func TestMapsToStructsSingle(t *testing.T) {
 		if assert.Equal(t, 2, len(user.Sports), "slices should be the right size") {
 			assert.Equal(t, "football", user.Sports[0], "values should be correctly set")
 		}
+	}
+}
+
+func TestMapToMap(t *testing.T) {
+
+	var receiver map[int]string
+
+	input := make(map[interface{}]interface{})
+
+	err := mapstostructs.MapToMap(input, &receiver)
+
+	assert.Nil(t, err, "an empty map should not cause an error")
+
+	input["5"] = "test1"
+
+	err = mapstostructs.MapToMap(input, &receiver)
+
+	if assert.Nil(t, err) {
+		assert.Equal(t, input["5"], receiver[5])
+	}
+
+	input["invalid"] = "test2"
+
+	err = mapstostructs.MapToMap(input, &receiver)
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "the map key for a map[int]string must be or be convertible to int type, but received 'invalid'", err.Error(), "error message should be identify cause")
+	}
+
+	delete(input, "invalid")
+
+	err = mapstostructs.MapToMap(input, &receiver)
+
+	assert.Nil(t, err)
+
+	input["10"] = 65
+
+	err = mapstostructs.MapToMap(input, &receiver)
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "the map value for a map[int]string must be or be convertible to string type, but received '65'", err.Error(), "error message should be identify cause")
+	}
+
+	badReceiver1 := "invalid"
+	err = mapstostructs.MapToMap(input, badReceiver1)
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "the receiver argument must be a ptr to a map but a string was given", err.Error(), "error message should be identify cause")
+	}
+
+	err = mapstostructs.MapToMap(input, &badReceiver1)
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "the receiver argument must be a ptr to a map but a ptr to a string was given", err.Error(), "error message should be identify cause")
 	}
 }
