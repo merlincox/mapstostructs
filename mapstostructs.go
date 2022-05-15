@@ -46,7 +46,7 @@ func MapsToStructs(inputMaps []map[string]interface{}, receivers interface{}, ta
 		return fmt.Errorf(notStructSliceReceiversMsg, "ptr to a slice of "+structType.Kind().String())
 	}
 
-	return setSlice(reflect.ValueOf(receivers).Elem(), structType, inputMaps, tags)
+	return setSlice(reflect.ValueOf(receivers).Elem(), structType, reflect.ValueOf(inputMaps), tags)
 }
 
 // MapToStruct provides functionality for a struct to be populated from a map[string]interface{} with the option of
@@ -181,11 +181,9 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 		}
 	}
 
-	if wantType.Kind() == reflect.Slice {
-		if inputMaps, ok := interfacesToMapInterfaces(value); ok {
+	if wantType.Kind() == reflect.Slice && value.Type().Kind() == reflect.Slice {
 
-			return setSlice(receivingValue, wantType.Elem(), inputMaps, tags)
-		}
+		return setSlice(receivingValue, wantType.Elem(), value, tags)
 	}
 
 	if wantType.Kind() == reflect.Map && value.Type().Kind() == reflect.Map {
@@ -197,11 +195,11 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 }
 
 func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
-	wantKeyType := wantType.Key()
 	if inputValue.Len() == 0 {
 
 		return nil
 	}
+	wantKeyType := wantType.Key()
 	mapToSet := reflect.MakeMap(wantType)
 	mapRange := inputValue.MapRange()
 
@@ -292,11 +290,15 @@ func convertToType(value reflect.Value, wantType reflect.Type, mapIndex bool) (r
 	return reflect.Value{}, false
 }
 
-func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []map[string]interface{}, tags []string) error {
-	sliceValues := reflect.MakeSlice(reflect.SliceOf(wantType), 0, len(inputMaps))
-	for i, inputMap := range inputMaps {
+func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
+	if inputValue.Len() == 0 {
+
+		return nil
+	}
+	sliceValues := reflect.MakeSlice(reflect.SliceOf(wantType), 0, inputValue.Len())
+	for i := 0; i < inputValue.Len(); i++ {
 		valueToSet := reflect.Indirect(reflect.New(wantType))
-		if err := setRecursively(valueToSet, reflect.ValueOf(inputMap), tags); err != nil {
+		if err := setRecursively(valueToSet, inputValue.Index(i), tags); err != nil {
 
 			return fmt.Errorf(err.Error()+rowSuffix, i+1)
 		}
@@ -305,21 +307,6 @@ func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputMaps []m
 	setValue(receivingValue, sliceValues)
 
 	return nil
-}
-
-func interfacesToMapInterfaces(value reflect.Value) ([]map[string]interface{}, bool) {
-	inputs, ok := value.Interface().([]interface{})
-	if !ok {
-		return nil, false
-	}
-	outMaps := make([]map[string]interface{}, len(inputs))
-	for i := range inputs {
-		outMaps[i], ok = inputs[i].(map[string]interface{})
-		if !ok {
-			return nil, false
-		}
-	}
-	return outMaps, true
 }
 
 func setValue(receivingValue reflect.Value, value reflect.Value) {
