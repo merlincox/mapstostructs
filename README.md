@@ -8,7 +8,7 @@ There is support for `map[string]interface{}` to struct conversions embedded wit
 
 There is also support for `map[string]interface{}` to `map[`{numeric}`]interface{}` where numeric is of `int`, `int64`, `int32`, `int16`, `int8`, `uint`, `uint64`, `uint32`, `uint16`, `uint8`, `float64` or `float32` type.
 
-This is to support the situation where a map with numeric keys has been converted to a JSON representation with string keys.
+This is to support the situation where a map with numeric keys has been converted by JSON unmarshalling into a map with string keys.
 
 ```go
 package main

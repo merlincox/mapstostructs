@@ -85,7 +85,7 @@ func MapToStruct(inputMap map[string]interface{}, receiver interface{}, tags ...
 // Conversion of map[string]interface() to struct embedded within the map[string]interface{} is permitted.
 //
 // Maps with numeric keys will accept string representations of numeric values.
-func MapToMap(inputMap map[interface{}]interface{}, receiver interface{}, tags ...string) error {
+func MapToMap(inputMap map[string]interface{}, receiver interface{}, tags ...string) error {
 	if reflect.ValueOf(receiver).Kind() != reflect.Ptr {
 		return fmt.Errorf(notMapReceiverMsg, reflect.ValueOf(receiver).Kind().String())
 	}
@@ -153,10 +153,6 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 }
 
 func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []string) error {
-	if value.Kind() == reflect.Invalid {
-
-		return nil
-	}
 	if value.Type().Kind() == reflect.Ptr {
 
 		return setRecursively(receivingValue, value.Elem(), tags)

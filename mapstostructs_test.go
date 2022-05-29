@@ -442,6 +442,26 @@ func TestMapsToStructsBadReceiver1(t *testing.T) {
 	}
 }
 
+func TestNilMaps(t *testing.T) {
+	var maps []map[string]interface{}
+
+	var users []UserWithPointers
+
+	err := mapstostructs.MapsToStructs(maps, &users)
+
+	assert.Nil(t, err, "passing nil maps should not error")
+}
+
+func TestNilMap(t *testing.T) {
+	var amap map[string]interface{}
+
+	var user UserWithPointers
+
+	err := mapstostructs.MapToStruct(amap, &user)
+
+	assert.Nil(t, err, "passing nil map should not error")
+}
+
 func TestMapsToStructsBadReceiver2(t *testing.T) {
 	maps := []map[string]interface{}{
 		{"id": 213, "name": "Zhaoliu", "gender": "male", "age": 19},
@@ -528,7 +548,7 @@ func TestMapToMap(t *testing.T) {
 
 	var receiver map[int]string
 
-	input := make(map[interface{}]interface{})
+	input := make(map[string]interface{})
 
 	err := mapstostructs.MapToMap(input, &receiver)
 
