@@ -70,7 +70,7 @@ func MapToStruct(inputMap map[string]interface{}, receiver interface{}, tags ...
 		return fmt.Errorf(notStructReceiverMsg, "ptr to a "+structType.Kind().String())
 	}
 
-	return setStruct(reflect.ValueOf(receiver).Elem(), structType, inputMap, tags)
+	return setStruct2(reflect.ValueOf(receiver).Elem(), structType, reflect.ValueOf(inputMap), tags)
 }
 
 // MapToMap allows a map to be populated from another map, allowing key and value conversions where these are
@@ -121,6 +121,35 @@ func makeTagMap(structType reflect.Type, tags []string) map[string]string {
 	return tagMap
 }
 
+func setStruct2(receivingValue reflect.Value, wantType reflect.Type, inputValue reflect.Value, tags []string) error {
+	tagMap := makeTagMap(wantType, tags)
+	structValue := reflect.Indirect(reflect.New(wantType))
+	mapRange := inputValue.MapRange()
+	for mapRange.Next() {
+		if fieldName, ok := tagMap[mapRange.Key().String()]; ok {
+			err := setStructField2(structValue, fieldName, mapRange.Value().Elem(), tags)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	setValue(receivingValue, structValue)
+
+	return nil
+}
+
+func setStructField2(receivingValue reflect.Value, fieldName string, value reflect.Value, tags []string) error {
+	receivingField := receivingValue.FieldByName(fieldName)
+	structName := receivingValue.Type().Name()
+
+	if err := setRecursively(receivingField, value, tags); err != nil {
+
+		return fmt.Errorf(structPrefix+err.Error(), fieldName, structName)
+	}
+
+	return nil
+}
+
 func setStruct(receivingValue reflect.Value, wantType reflect.Type, inputMap map[string]interface{}, tags []string) error {
 	tagMap := makeTagMap(wantType, tags)
 	structValue := reflect.Indirect(reflect.New(wantType))
@@ -153,7 +182,7 @@ func setStructField(object interface{}, fieldName string, mapValue interface{}, 
 }
 
 func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []string) error {
-	if value.Type().Kind() == reflect.Ptr {
+	if value.Kind() == reflect.Ptr {
 
 		return setRecursively(receivingValue, value.Elem(), tags)
 	}
@@ -177,12 +206,12 @@ func setRecursively(receivingValue reflect.Value, value reflect.Value, tags []st
 		}
 	}
 
-	if wantType.Kind() == reflect.Slice && value.Type().Kind() == reflect.Slice {
+	if wantType.Kind() == reflect.Slice && value.Kind() == reflect.Slice {
 
 		return setSlice(receivingValue, wantType.Elem(), value, tags)
 	}
 
-	if wantType.Kind() == reflect.Map && value.Type().Kind() == reflect.Map {
+	if wantType.Kind() == reflect.Map && value.Kind() == reflect.Map {
 
 		return setMap(receivingValue, wantType, value, tags)
 	}
@@ -221,66 +250,67 @@ func setMap(receivingValue reflect.Value, wantType reflect.Type, inputValue refl
 }
 
 func convertToType(value reflect.Value, wantType reflect.Type, mapIndex bool) (reflect.Value, bool) {
+	if value.IsValid() {
+		if value.Type() == wantType {
 
-	if value.Type() == wantType {
-
-		return value, true
-	}
-
-	// number to string conversions will produce ASCII values and are not wanted
-	if wantType.Kind() != reflect.String && value.CanConvert(wantType) {
-
-		return value.Convert(wantType), true
-	}
-
-	if value.Type().Kind() == reflect.Interface {
-
-		return convertToType(value.Elem(), wantType, mapIndex)
-	}
-
-	if mapIndex && value.Type().Kind() == reflect.String {
-		// support reverse string to number conversions for maps with numeric keys converted to strings
-		// in JSON representations
-		var convertedVal reflect.Value
-		stringVar := value.Interface().(string)
-		switch wantType.Kind() {
-
-		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-			int64Var, err := strconv.ParseInt(stringVar, 10, 64)
-
-			if err != nil {
-
-				return reflect.Value{}, false
-			}
-
-			convertedVal = reflect.ValueOf(int64Var)
-
-		case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
-			uint64Var, err := strconv.ParseUint(stringVar, 10, 64)
-
-			if err != nil {
-
-				return reflect.Value{}, false
-			}
-
-			convertedVal = reflect.ValueOf(uint64Var)
-
-		case reflect.Float64, reflect.Float32:
-			float64Var, err := strconv.ParseFloat(stringVar, 64)
-
-			if err != nil {
-
-				return reflect.Value{}, false
-			}
-
-			convertedVal = reflect.ValueOf(float64Var)
-
-		default:
-
-			return reflect.Value{}, false
+			return value, true
 		}
 
-		return convertToType(convertedVal, wantType, false)
+		// number to string conversions will produce ASCII values and are not wanted
+		if wantType.Kind() != reflect.String && value.CanConvert(wantType) {
+
+			return value.Convert(wantType), true
+		}
+
+		if value.Kind() == reflect.Interface {
+
+			return convertToType(value.Elem(), wantType, mapIndex)
+		}
+
+		if mapIndex && value.Kind() == reflect.String {
+			// support reverse string to number conversions for maps with numeric keys converted to strings
+			// in JSON representations
+			var convertedVal reflect.Value
+			stringVar := value.String()
+			switch wantType.Kind() {
+
+			case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+				int64Var, err := strconv.ParseInt(stringVar, 10, 64)
+
+				if err != nil {
+
+					return reflect.Value{}, false
+				}
+
+				convertedVal = reflect.ValueOf(int64Var)
+
+			case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+				uint64Var, err := strconv.ParseUint(stringVar, 10, 64)
+
+				if err != nil {
+
+					return reflect.Value{}, false
+				}
+
+				convertedVal = reflect.ValueOf(uint64Var)
+
+			case reflect.Float64, reflect.Float32:
+				float64Var, err := strconv.ParseFloat(stringVar, 64)
+
+				if err != nil {
+
+					return reflect.Value{}, false
+				}
+
+				convertedVal = reflect.ValueOf(float64Var)
+
+			default:
+
+				return reflect.Value{}, false
+			}
+
+			return convertToType(convertedVal, wantType, false)
+		}
 	}
 
 	return reflect.Value{}, false
@@ -306,7 +336,7 @@ func setSlice(receivingValue reflect.Value, wantType reflect.Type, inputValue re
 }
 
 func setValue(receivingValue reflect.Value, value reflect.Value) {
-	if receivingValue.Type().Kind() == reflect.Ptr {
+	if receivingValue.Kind() == reflect.Ptr {
 		receivingValue.Set(reflect.New(receivingValue.Type().Elem()))
 		receivingValue.Elem().Set(value)
 	} else {
