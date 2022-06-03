@@ -437,7 +437,7 @@ func TestMapsToStructsBadReceiver1(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, "test")
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
-		expected := "the receivers argument must be a ptr to a slice of struct but a string was given"
+		expected := "the receiver argument must be a ptr to a slice of struct but a string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
@@ -474,7 +474,7 @@ func TestMapsToStructsBadReceiver2(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, &test)
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
-		expected := "the receivers argument must be a ptr to a slice of struct but a ptr to a string was given"
+		expected := "the receiver argument must be a ptr to a slice of struct but a ptr to a string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
@@ -491,7 +491,7 @@ func TestMapsToStructsBadReceiver3(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, &test)
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
-		expected := "the receivers argument must be a ptr to a slice of struct but a ptr to a slice of string was given"
+		expected := "the receiver argument must be a ptr to a slice of struct but a ptr to a slice of string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
