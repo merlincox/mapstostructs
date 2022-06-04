@@ -108,7 +108,7 @@ func makeTagMap(structType reflect.Type, tags []string) map[string]string {
 			tag, ok := field.Tag.Lookup(tagName)
 			if ok {
 				parts := strings.Split(tag, ",")
-				tagMap[parts[0]] = field.Name
+				tagMap[strings.ToLower(parts[0])] = field.Name
 				tagged = true
 				break
 			}
@@ -153,7 +153,7 @@ func setStructFromMap(receiver reflect.Value, input reflect.Value, tags []string
 	newStructValue := reflect.Indirect(reflect.New(wantType))
 	mapRange := input.MapRange()
 	for mapRange.Next() {
-		if fieldName, ok := tagMap[mapRange.Key().String()]; ok {
+		if fieldName, ok := tagMap[strings.ToLower(mapRange.Key().String())]; ok {
 			receivingField := newStructValue.FieldByName(fieldName)
 			inputField := mapRange.Value().Elem()
 			if err := setRecursively(receivingField, inputField, tags); err != nil {
