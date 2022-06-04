@@ -173,10 +173,9 @@ func convertToType(input reflect.Value, wantType reflect.Type, convertMapIndexes
 				parsed, ok = reflect.ValueOf(float64Var), err == nil
 			}
 
-			if !ok {
-				return reflect.Value{}, false
+			if ok {
+				return convertToType(parsed, wantType, false)
 			}
-			return convertToType(parsed, wantType, false)
 		}
 	}
 	return reflect.Value{}, false
