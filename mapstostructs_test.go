@@ -437,9 +437,29 @@ func TestMapsToStructsBadReceiver1(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, "test")
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
-		expected := "the receivers argument must be a ptr to a slice of struct but a string was given"
+		expected := "the receiver argument must be a ptr to a slice of struct but a string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
+}
+
+func TestNilMaps(t *testing.T) {
+	var maps []map[string]interface{}
+
+	var users []UserWithPointers
+
+	err := mapstostructs.MapsToStructs(maps, &users)
+
+	assert.Nil(t, err, "passing nil maps should not error")
+}
+
+func TestNilMap(t *testing.T) {
+	var amap map[string]interface{}
+
+	var user UserWithPointers
+
+	err := mapstostructs.MapToStruct(amap, &user)
+
+	assert.Nil(t, err, "passing nil map should not error")
 }
 
 func TestMapsToStructsBadReceiver2(t *testing.T) {
@@ -454,7 +474,7 @@ func TestMapsToStructsBadReceiver2(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, &test)
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
-		expected := "the receivers argument must be a ptr to a slice of struct but a ptr to a string was given"
+		expected := "the receiver argument must be a ptr to a slice of struct but a ptr to a string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
@@ -471,7 +491,7 @@ func TestMapsToStructsBadReceiver3(t *testing.T) {
 	err := mapstostructs.MapsToStructs(maps, &test)
 
 	if assert.NotNil(t, err, "error should not be nil with an invalid receiver") {
-		expected := "the receivers argument must be a ptr to a slice of struct but a ptr to a slice of string was given"
+		expected := "the receiver argument must be a ptr to a slice of struct but a ptr to a slice of string was given"
 		assert.Equal(t, expected, err.Error(), "the error string should identify the bad data location")
 	}
 }
@@ -528,7 +548,7 @@ func TestMapToMap(t *testing.T) {
 
 	var receiver map[int]string
 
-	input := make(map[interface{}]interface{})
+	input := make(map[string]interface{})
 
 	err := mapstostructs.MapToMap(input, &receiver)
 
@@ -575,5 +595,16 @@ func TestMapToMap(t *testing.T) {
 
 	if assert.NotNil(t, err) {
 		assert.Equal(t, "the receiver argument must be a ptr to a map but a ptr to a string was given", err.Error(), "error message should be identify cause")
+	}
+}
+
+func TestInputs(t *testing.T) {
+
+	var userMap map[int]User
+
+	err := mapstostructs.MapToMap("test", &userMap)
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "the input argument must be a map but a string was given", err.Error(), "error message should be identify cause")
 	}
 }
