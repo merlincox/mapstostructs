@@ -267,7 +267,7 @@ func BenchmarkMapToStructJSON(b *testing.B) {
 	innerBenchmarkMapToStruct(b, jsonMapToStruct)
 }
 
-type mapFunc func(map[string]interface{}, interface{}, ...string) error
+type mapFunc func(interface{}, interface{}, ...string) error
 
 func innerBenchmarkMapToMap(b *testing.B, fn mapFunc) {
 	var receiver map[int]Outer
@@ -314,7 +314,7 @@ func jsonMapToStruct(input map[string]interface{}, receiver interface{}, tags ..
 	return json.Unmarshal(raw, receiver)
 }
 
-func jsonMapToMap(intStringMap map[string]interface{}, receiver interface{}, tags ...string) error {
+func jsonMapToMap(intStringMap interface{}, receiver interface{}, tags ...string) error {
 	data, err := json.Marshal(intStringMap)
 	if err != nil {
 		return err

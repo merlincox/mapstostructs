@@ -597,3 +597,14 @@ func TestMapToMap(t *testing.T) {
 		assert.Equal(t, "the receiver argument must be a ptr to a map but a ptr to a string was given", err.Error(), "error message should be identify cause")
 	}
 }
+
+func TestInputs(t *testing.T) {
+
+	var userMap map[int]User
+
+	err := mapstostructs.MapToMap("test", &userMap)
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, "the input argument must be a map but a string was given", err.Error(), "error message should be identify cause")
+	}
+}
