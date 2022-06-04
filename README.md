@@ -72,7 +72,7 @@ func main() {
         fmt.Printf("%s is %s and %d, lives in %s and plays %s\n", users[0].Name, users[0].Gender, users[0].Age, users[0].Location.City, users[0].Sports[0])
     }
 }
-	// Outputs: 
+    // Outputs: 
     // Zhaoliu is male and 19, lives in London and plays football
     // Zhaoliu is male and 19, lives in London and plays football
 ```
