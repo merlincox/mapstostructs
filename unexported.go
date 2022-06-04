@@ -36,13 +36,11 @@ func makeTagMap(structType reflect.Type, tags []string) map[string]string {
 			tagMap[strings.ToLower(field.Name)] = field.Name
 		}
 	}
-
 	return tagMap
 }
 
 func setSlice(receiver reflect.Value, input reflect.Value, tags []string) error {
 	if input.Len() == 0 {
-
 		return nil
 	}
 	elementType := receiver.Type().Elem()
@@ -50,7 +48,6 @@ func setSlice(receiver reflect.Value, input reflect.Value, tags []string) error 
 	for i := 0; i < input.Len(); i++ {
 		newElement := reflect.Indirect(reflect.New(elementType))
 		if err := setRecursively(newElement, input.Index(i), tags); err != nil {
-
 			return fmt.Errorf(err.Error()+rowSuffix, i+1)
 		}
 		newSliceValue = reflect.Append(newSliceValue, newElement)
@@ -76,19 +73,16 @@ func setStructFromMap(receiver reflect.Value, input reflect.Value, tags []string
 			receivingField := newStructValue.FieldByName(fieldName)
 			inputField := mapRange.Value().Elem()
 			if err := setRecursively(receivingField, inputField, tags); err != nil {
-
 				return fmt.Errorf(structPrefix+err.Error(), fieldName, receiver.Type().Name())
 			}
 		}
 	}
 	setValue(receiver, newStructValue)
-
 	return nil
 }
 
 func setMap(receiver reflect.Value, input reflect.Value, tags []string) error {
 	if input.Len() == 0 {
-
 		return nil
 	}
 	wantType := receiver.Type()
@@ -101,25 +95,21 @@ func setMap(receiver reflect.Value, input reflect.Value, tags []string) error {
 		if !ok {
 			want := wantKeyType.String()
 			have := mapRange.Key().Interface()
-
 			return fmt.Errorf(mapKeyPrefix+badValueMsg, wantType.String(), want, have)
 		}
 
 		newElement := reflect.Indirect(reflect.New(wantType.Elem()))
 		if err := setRecursively(newElement, mapRange.Value(), tags); err != nil {
-
 			return fmt.Errorf(mapValuePrefix+err.Error(), wantType.String())
 		}
 		newMapValue.SetMapIndex(key, newElement)
 	}
 	setValue(receiver, newMapValue)
-
 	return nil
 }
 
 func setRecursively(receiver reflect.Value, input reflect.Value, tags []string) error {
 	if input.Kind() == reflect.Ptr || input.Kind() == reflect.Interface {
-
 		return setRecursively(receiver, input.Elem(), tags)
 	}
 	have := input.Interface()
@@ -131,22 +121,18 @@ func setRecursively(receiver reflect.Value, input reflect.Value, tags []string) 
 
 	if valueToSet, ok := convertToType(input, wantType, false); ok {
 		setValue(receiver, valueToSet)
-
 		return nil
 	}
 
 	if wantType.Kind() == reflect.Struct && input.Kind() == reflect.Map && input.Type().Key().Kind() == reflect.String {
-
 		return setStructFromMap(receiver, input, tags)
 	}
 
 	if wantType.Kind() == reflect.Slice && input.Kind() == reflect.Slice {
-
 		return setSlice(receiver, input, tags)
 	}
 
 	if wantType.Kind() == reflect.Map && input.Kind() == reflect.Map {
-
 		return setMap(receiver, input, tags)
 	}
 
@@ -156,62 +142,43 @@ func setRecursively(receiver reflect.Value, input reflect.Value, tags []string) 
 func convertToType(input reflect.Value, wantType reflect.Type, convertMapIndexes bool) (reflect.Value, bool) {
 	if input.IsValid() {
 		if input.Type() == wantType {
-
 			return input, true
 		}
 
-		// number to string conversions will produce ASCII values and are not wanted
+		// Number to string conversions will produce ASCII values and are not wanted.
 		if wantType.Kind() != reflect.String && input.CanConvert(wantType) {
-
 			return input.Convert(wantType), true
 		}
 
 		if convertMapIndexes && input.Kind() == reflect.String {
-			// support reverse string to number conversions for maps with numeric keys converted to strings
-			// in JSON representations, etc
-			var convertedVal reflect.Value
+			// Support reverse string to number parsing conversions for maps with numeric keys converted to strings
+			// in JSON representations, etc.
+			var (
+				parsed reflect.Value
+				ok     bool
+			)
 			stringVar := input.String()
 			switch wantType.Kind() {
 
 			case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 				int64Var, err := strconv.ParseInt(stringVar, 10, 64)
-
-				if err != nil {
-
-					return reflect.Value{}, false
-				}
-
-				convertedVal = reflect.ValueOf(int64Var)
+				parsed, ok = reflect.ValueOf(int64Var), err == nil
 
 			case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 				uint64Var, err := strconv.ParseUint(stringVar, 10, 64)
-
-				if err != nil {
-
-					return reflect.Value{}, false
-				}
-
-				convertedVal = reflect.ValueOf(uint64Var)
+				parsed, ok = reflect.ValueOf(uint64Var), err == nil
 
 			case reflect.Float64, reflect.Float32:
 				float64Var, err := strconv.ParseFloat(stringVar, 64)
-
-				if err != nil {
-
-					return reflect.Value{}, false
-				}
-
-				convertedVal = reflect.ValueOf(float64Var)
-
-			default:
-
-				return reflect.Value{}, false
+				parsed, ok = reflect.ValueOf(float64Var), err == nil
 			}
 
-			return convertToType(convertedVal, wantType, false)
+			if !ok {
+				return reflect.Value{}, false
+			}
+			return convertToType(parsed, wantType, false)
 		}
 	}
-
 	return reflect.Value{}, false
 }
 
