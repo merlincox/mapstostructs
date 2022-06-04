@@ -7,3 +7,6 @@ test:
 
 benchmark:
 	go test -bench=.
+
+lint:
+	golangci-lint run

@@ -197,7 +197,7 @@ func randomOuter() Outer {
 	pStructVal := randomInner()
 
 	var ifaceVal interface{}
-	if rand.Intn(1) == 0 {
+	if rand.Intn(2) == 0 {
 		ifaceVal = rand.Intn(10)
 	} else {
 		ifaceVal = randomString(10)
